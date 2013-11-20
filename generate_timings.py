@@ -56,9 +56,12 @@ def Duration(events):
 
 # NOTE_LIST is a pre-defined Note Function which always returns the same list of
 # notes regardless of the step number or player number.
-def NOTE_LIST(notes):
+def NOTE_LIST(*notes):
   def ReturnNotes(step_number, player_number):
-    return notes
+    to_return = []
+    for note in notes:
+      to_return.append(note)
+    return to_return
   return ReturnNotes
 
 REST = True
