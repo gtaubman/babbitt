@@ -2,6 +2,7 @@ import math
 import os
 import random
 import sys
+from string import Template
 
 # PLAYER FUNCTIONS
 #
@@ -253,153 +254,8 @@ class Gesture:
     return events
 
 
-def HTMLHeader(out):
-  out.write("""
-<html>
-<head>
-<style>
-div.span-mark {
-  border: 1px black solid;
-  position: absolute;
-  opacity: 0.8;
-  overflow: hidden;
-  font-size: 8pt;
-  line-height: 4px;
-}
-div.marker {
-  position: absolute;
-  background-color: black;
-  z-index: -1;
-}
-div.cross-marker {
-  position: absolute;
-  background-color: #EEEEEE;
-  z-index: -1;
-}
-div.timestamp {
-  position: absolute;
-  text-align: center;
-  border: 1px solid black;
-  padding: 2px;
-}
-div.players {
-  position: fixed;
-  bottom: 100;
-  left: 100;
-}
-div.instrument {
-  border: 1px black solid;
-  width: 10px;
-  height: 10px;
-  float: left;
-  background: white;
-}
-div.controls {
-  position: fixed;
-  bottom: 50;
-}
-#timeline-wrapper {
-  position: relative;
-}
-html, body {
-  margin: 0;
-  padding: 0;
-}
-</style>
-<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-</head>
-<body>
-<div id="timeline-wrapper">
-  """)
-
-def WritePlayers(num_players, instruments, out):
-  out.write("<div class='players'>")
-  for pn in xrange(num_players):
-    out.write("<div id='player-%d'>" % pn)
-    for instrument in xrange(len(instruments)):
-      out.write("  <div class='instrument' id='%s'></div>" % instrument)
-    out.write("</div>")
-  out.write("</div>")
-
-def WriteControl(out, piece_length):
-  out.write("""
-
-</div>
-<div class="controls">
-<span id="top">&lt;&lt;</span> | <span id="play">Play</span> | <span
-
-id="stop">Stop</span>
-</div>
-
-<script>
-$("#top").click(function() {
-  $("body").scrollLeft(0);
-});
-$("#play").click(function() {
-  var instrumentColors = [
-    "red", "blue", "green", "yellow", "cyan", "orange", "brown", "black",
-  ];
-  var eventsInOrder = []
-  var spans = $(".span-mark");
-  for (var i = 0; i < spans.length; i++) {
-    var start = $(spans[i]).attr("start-ms");
-    var stop = $(spans[i]).attr("stop-ms");
-
-    var onInfo = {"player": $(spans[i]).attr("player"),
-                  "instrument": Number($(spans[i]).attr("instrument")),
-                  "action": "on"}
-    var offInfo = {"player": $(spans[i]).attr("player"),
-                   "instrument": Number($(spans[i]).attr("instrument")),
-                   "action": "off"}
-
-    eventsInOrder.push({"ts": start, "info": onInfo});
-    eventsInOrder.push({"ts": Number(stop) - 20, "info": offInfo});
-  }
-  eventsInOrder.sort(function(a, b) { return a.ts- b.ts});
-
-  var currentPosition = $("body").scrollLeft();
-  var seconds = """ + str(piece_length) + """;
-  var pixelsPerSecond = 70;
-  var eventIndex = 0;
-  $("body").animate({scrollLeft: currentPosition + (pixelsPerSecond * seconds)},
-    {
-      duration: 1000 * seconds,
-      easing: "linear",
-      step: function(left) {
-        var ts_ms = (left / pixelsPerSecond) * 1000;
-        var newEventIndex = eventIndex;
-        for (var i = eventIndex; i < eventsInOrder.length; i++) {
-          if (eventsInOrder[i].ts < ts_ms) {
-            // Execute it!
-            var event = eventsInOrder[i];
-            var color = "white";
-            if (event.info.action === "on") {
-              color = instrumentColors[event.info.instrument]
-            }
-
-            var player = $("#player-" + event.info.player);
-            var instrument = player.children("#" + event.info.instrument);
-            instrument.css("background", color);
-            newEventIndex = i + 1;
-          } else {
-            break;
-          }
-        }
-
-        eventIndex = newEventIndex;
-      }
-    });
-});
-$("#stop").click(function() {
-  $("body").stop();
-});
-</script>
-
-</body>
-</html>
-""")
-
-EDGE = 70
+# Visualization related functions.
+EDGE = 50
 
 colors = []
 for i in xrange(30):
@@ -454,6 +310,162 @@ def TimeGrid(out, max_seconds):
 """ % (marker_height, i * EDGE, "%d:%02d" % (i/60, i%60))
     out.write(div)
 
+def HTMLHeader(out):
+  out.write("""
+<html>
+<head>
+<style>
+div.span-mark {
+  border: 1px black solid;
+  position: absolute;
+  opacity: 0.8;
+  overflow: hidden;
+  font-size: 8pt;
+  line-height: 4px;
+}
+div.marker {
+  position: absolute;
+  background-color: black;
+  z-index: -1;
+}
+div.cross-marker {
+  position: absolute;
+  background-color: #EEEEEE;
+  z-index: -1;
+}
+div.timestamp {
+  position: absolute;
+  text-align: center;
+  border: 1px solid black;
+  padding: 2px;
+}
+div.players {
+  position: fixed;
+  bottom: 100;
+  left: 100;
+}
+div.instrument {
+  border: 1px black solid;
+  width: 10px;
+  height: 10px;
+  float: left;
+  background: white;
+}
+div.instrument-label {
+  -webkit-transform: rotate(-90deg);
+  width: 10px;
+  float: left;
+  font-size: 8pt;
+  border: 1px white solid;
+}
+div.controls {
+  position: fixed;
+  bottom: 50;
+}
+#timeline-wrapper {
+  position: relative;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+}
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+</head>
+<body>
+<div id="timeline-wrapper">
+  """)
+
+def WritePlayers(num_players, instruments, out):
+  out.write("<div class='players'>\n")
+  for instrument in instruments:
+    out.write("<div class='instrument-label'>%s</div>\n" % instrument)
+  for pn in xrange(num_players):
+    out.write("<div id='player-%d'>\n" % pn)
+    for instrument in xrange(len(instruments)):
+      out.write("  <div class='instrument' id='%s'></div>\n" % instrument)
+    out.write("</div>\n")
+  out.write("</div>\n")
+
+def WriteControl(out, piece_length):
+  out.write("""
+
+</div>
+<div class="controls">
+<span id="top">&lt;&lt;</span> | <span id="play">Play</span> | <span
+
+id="stop">Stop</span>
+</div>
+
+<script>
+$("#top").click(function() {
+  $("body").scrollLeft(0);
+});
+$("#play").click(function() {
+  var instrumentColors = [
+    "red", "blue", "green", "yellow", "cyan", "orange", "brown", "black",
+  ];
+  var eventsInOrder = []
+  var spans = $(".span-mark");
+  for (var i = 0; i < spans.length; i++) {
+    var start = $(spans[i]).attr("start-ms");
+    var stop = $(spans[i]).attr("stop-ms");
+
+    var onInfo = {"player": $(spans[i]).attr("player"),
+                  "instrument": Number($(spans[i]).attr("instrument")),
+                  "action": "on"}
+    var offInfo = {"player": $(spans[i]).attr("player"),
+                   "instrument": Number($(spans[i]).attr("instrument")),
+                   "action": "off"}
+
+    eventsInOrder.push({"ts": start, "info": onInfo});
+    eventsInOrder.push({"ts": Number(stop) - 20, "info": offInfo});
+  }
+  eventsInOrder.sort(function(a, b) { return a.ts- b.ts});
+
+  var currentPosition = $("body").scrollLeft();
+  var seconds = """ + str(piece_length) + """;
+  var pixelsPerSecond = """ + str(EDGE) + """;
+  var eventIndex = 0;
+  $("body").animate({scrollLeft: currentPosition + (pixelsPerSecond * seconds)},
+    {
+      duration: 1000 * seconds,
+      easing: "linear",
+      step: function(left) {
+        var ts_ms = (left / pixelsPerSecond) * 1000;
+        var newEventIndex = eventIndex;
+        for (var i = eventIndex; i < eventsInOrder.length; i++) {
+          if (eventsInOrder[i].ts < ts_ms) {
+            // Execute it!
+            var event = eventsInOrder[i];
+            var color = "white";
+            if (event.info.action === "on") {
+              color = instrumentColors[event.info.instrument]
+            }
+
+            var player = $("#player-" + event.info.player);
+            var instrument = player.children("#" + event.info.instrument);
+            instrument.css("background", color);
+            newEventIndex = i + 1;
+          } else {
+            break;
+          }
+        }
+
+        eventIndex = newEventIndex;
+      }
+    });
+});
+$("#stop").click(function() {
+  $("body").stop();
+});
+</script>
+
+</body>
+</html>
+""")
+
+
 def START_GESTURE(gesture, player_steps, start_time, tempo):
   global visualization_file
   global all_instruments
@@ -495,5 +507,5 @@ if __name__ == "__main__":
   execfile(sys.argv[1])
 
   TimeGrid(visualization_file, piece_length + 60)
-  WriteControl(visualization_file, piece_length)
   WritePlayers(NUM_PLAYERS, all_instruments, visualization_file)
+  WriteControl(visualization_file, piece_length)
