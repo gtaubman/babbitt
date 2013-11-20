@@ -2,7 +2,6 @@ import math
 import os
 import random
 import sys
-from string import Template
 
 # PLAYER FUNCTIONS
 #
@@ -192,6 +191,7 @@ class Event:
     self.instrument = instrument
     self.start = start
     self.stop = stop
+    self.gesture_end = -1
 
   def __str__(self):
     return "%d(%s) %.2f -> %.2f" % (self.player_num, self.instrument,
@@ -250,6 +250,14 @@ class Gesture:
           self.instrument,
           start_time + player_start,
           start_time + player_stop))
+
+      if step == steps - 1:
+        # If that was our last step, record separately when this gesture ended.
+        # The end of the gesture can be different from the end time of the last
+        # event because we don't store events for rests.  Thus if the list of
+        # notes ends with a rest, the stop time of the final event will be
+        # earlier than when the entire gesture is over.
+        events[-1].gesture_end = start_time + player_stop
 
       running_start += self.time_between_players(player,
           duration_for_player)
@@ -468,11 +476,53 @@ $("#stop").click(function() {
 </html>
 """)
 
+# PUBLIC FUNCTIONS
 
-def START_GESTURE(gesture, player_steps, start_time, tempo):
+# WHEN_DONE_PLAYING returns the end time of the specified gesture.
+def WHEN_DONE_PLAYING(play_id):
+  global gesture_infos
+
+  # If they request this gesture start after another gesture, make sure we've
+  # heard of that gesture.
+  if not play_id in gesture_infos:
+    print """
+Error: You asked to play a gesture when '%s' was done, but no
+gesture play named '%s' has happened yet.  Some likely explanations
+are:
+
+  1) You forgot to set play_id = "%s" when playing a gesture.
+  2) You mis-spelled "%s" when writing WHEN_DONE_PLAYING("%s") and in fact it
+     should be something else.
+  3) In your piece file, you must have PLAY_GESTURE with a play_id of "%s"
+     BEFORE you try to play another gesture using WHEN_DONE_PLAYING("%s"),
+     regardless of what the start_time is for the PLAY_GESTURE with a play_id of
+     "%s".  Perhaps you need to rearrange your PLAY_GESTURE commands?
+""" % (play_id, play_id, play_id, play_id, play_id, play_id, play_id, play_id)
+    sys.exit(1)
+
+  return gesture_infos[play_id]["end_time"]
+
+# AFTER_ALL_GESTURES_SO_FAR returns the end time of all the gestures that have
+# been played up until now.
+def AFTER_ALL_GESTURES_SO_FAR():
+  global gesture_infos
+  return max([info["end_time"] for info in gesture_infos.itervalues()])
+
+
+def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   global visualization_file
   global all_instruments
   global piece_length
+  global gesture_infos
+
+  if not play_id:
+    play_id = "unnamed_gesture_play_%d" % (len(gesture_infos))
+
+  # Make sure that if there's a unique id for this gesture that it's actually
+  # unique.
+  if play_id in gesture_infos:
+    print "Error: There is already a gesture with the play_id '%s'." % play_id
+    sys.exit(1)
 
   if not gesture.instrument in all_instruments:
     all_instruments.append(gesture.instrument)
@@ -483,6 +533,10 @@ def START_GESTURE(gesture, player_steps, start_time, tempo):
       player_steps,
       tempo,
       start_time)
+
+  # Keep track of when a gesture ended.
+  gesture_infos[play_id] = { }
+  gesture_infos[play_id]["end_time"] = events[-1].gesture_end
 
   # Write them to the HTML file.
   Events2HTML(visualization_file, all_instruments, events)
@@ -506,6 +560,7 @@ if __name__ == "__main__":
   HTMLHeader(visualization_file)
   piece_length = 0
   all_instruments = []
+  gesture_infos = {}
 
   execfile(sys.argv[1])
 
