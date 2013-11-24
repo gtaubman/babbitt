@@ -508,6 +508,13 @@ def AFTER_ALL_GESTURES_SO_FAR():
   global gesture_infos
   return max([info["end_time"] for info in gesture_infos.itervalues()])
 
+def AT_THE_SAME_TIME_AS(play_id):
+  global gesture_infos
+  return infos[play_id]["start_time"]
+
+def DURATION_OF(play_id):
+  global gesture_infos
+  return infos[play_id]["duration"]
 
 def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   global visualization_file
@@ -534,9 +541,11 @@ def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
       tempo,
       start_time)
 
-  # Keep track of when a gesture ended.
+  # Keep track of various bits of information about the gesture.
   gesture_infos[play_id] = { }
+  gesture_infos[play_id]["start_time"] = events[0].start
   gesture_infos[play_id]["end_time"] = events[-1].gesture_end
+  gesture_infos[play_id]["duration"] = events[-1].gesture_end - events[0].start
 
   # Write them to the HTML file.
   Events2HTML(visualization_file, all_instruments, events)
