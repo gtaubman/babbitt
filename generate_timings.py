@@ -565,7 +565,8 @@ if __name__ == "__main__":
     sys.exit(1)
 
   # Prepare for executing the program.
-  visualization_file = file("vis.html", "w")
+  piece_name = sys.argv[1].split(".")[0]
+  visualization_file = file("%s.html" % piece_name, "w")
   HTMLHeader(visualization_file)
   piece_length = 0
   all_instruments = []
@@ -576,3 +577,5 @@ if __name__ == "__main__":
   TimeGrid(visualization_file, piece_length + 60)
   WritePlayers(NUM_PLAYERS, all_instruments, visualization_file)
   WriteControl(visualization_file, piece_length)
+
+  print "Done!"
