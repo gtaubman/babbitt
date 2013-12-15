@@ -502,6 +502,9 @@ are:
 
   return gesture_infos[play_id]["end_time"]
 
+def GESTURE_END(play_id):
+  return WHEN_DONE_PLAYING(play_id)
+
 # AFTER_ALL_GESTURES_SO_FAR returns the end time of all the gestures that have
 # been played up until now.
 def AFTER_ALL_GESTURES_SO_FAR():
@@ -510,11 +513,14 @@ def AFTER_ALL_GESTURES_SO_FAR():
 
 def AT_THE_SAME_TIME_AS(play_id):
   global gesture_infos
-  return infos[play_id]["start_time"]
+  return gesture_infos[play_id]["start_time"]
+
+def GESTURE_START(play_id):
+  return AT_THE_SAME_TIME_AS(play_id)
 
 def DURATION_OF(play_id):
   global gesture_infos
-  return infos[play_id]["duration"]
+  return gesture_infos[play_id]["duration"]
 
 def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   global visualization_file
