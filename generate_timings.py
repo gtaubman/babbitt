@@ -227,29 +227,41 @@ class Gesture:
     running_start = 0
     events = []
 
+    furthest_along_finish = 0
     for step in xrange(steps):
       # Figure out who the player is for this step.
-      player = player_order[step % len(player_order)]
+      players = player_order[step % len(player_order)]
 
-      # Get the notes for this player, and figure out how long they are.
-      notes = self.notes(step, player)
-      duration_for_player = 0
-      for note in notes:
-        beat_length = note.GetBeats()
+      if type(players) is not list and type(players) is not tuple:
+        players = [players]
+
+      longest_simultaneous_player = 0
+      id_of_longest_player = -1
+      for player in players:
+        # Get the notes for this player, and figure out how long they are.
+        notes = self.notes(step, player)
         player_start = running_start
-        tempo = 60.0 / tempo_generator(player_start)
-        player_stop = player_start + tempo * beat_length
-        running_start = player_stop
-        duration_for_player += player_stop - player_start
+        duration_for_player = 0
+        for note in notes:
+          beat_length = note.GetBeats()
+          tempo = 60.0 / tempo_generator(player_start)
+          player_stop = player_start + tempo * beat_length
+          duration_for_player += player_stop - player_start
 
-        if note.IsRest():
-          # We don't need to create events for rest notes.
-          continue
+          if not note.IsRest():
+            events.append(Event(player,
+              self.instrument,
+              start_time + player_start,
+              start_time + player_stop))
 
-        events.append(Event(player,
-          self.instrument,
-          start_time + player_start,
-          start_time + player_stop))
+          player_start += duration_for_player
+          furthest_along_finish = max(furthest_along_finish, player_stop)
+
+        if duration_for_player > longest_simultaneous_player:
+          longest_simultaneous_player = duration_for_player
+          id_of_longest_player = player
+
+      running_start += longest_simultaneous_player
 
       if step == steps - 1:
         # If that was our last step, record separately when this gesture ended.
@@ -257,10 +269,10 @@ class Gesture:
         # event because we don't store events for rests.  Thus if the list of
         # notes ends with a rest, the stop time of the final event will be
         # earlier than when the entire gesture is over.
-        events[-1].gesture_end = start_time + player_stop
+        events[-1].gesture_end = start_time + furthest_along_finish
 
-      running_start += self.time_between_players(player,
-          duration_for_player)
+      running_start += self.time_between_players(id_of_longest_player,
+          furthest_along_finish)
 
     return events
 
