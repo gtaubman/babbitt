@@ -219,6 +219,40 @@ class Gesture:
   def GetTimeAfterPlayer(self, player_num, previous_player_duration):
     return 0
 
+  # Returns the duration of the specified note in seconds.
+  def _ComputeNoteDuration(self, note, start_ts, start_beat, tempo_fn):
+    # Into how many pieces we'd like to subdivide the note.
+    subdivide = 10000
+
+    # This is how many beats we need to compute.
+    beats = note.GetBeats()
+
+    # The size of each beat subdivision.  This is our dt if we were actually
+    # doing an integral.
+    subdivision_beat_length = beats / float(subdivide)
+
+    # For each subdivision, grab the tempo and figure out how long that makes
+    # our note in seconds.
+    total_note_seconds = 0.0
+    for subdivision in xrange(int(subdivide)):
+      # Fractional how far we are through our beats.
+      beat_fraction = beats * float(subdivision) / subdivide
+
+      # The tempo at this subdivision's fraction of beats.
+      subdivision_tempo = tempo_fn(
+          start_ts + total_note_seconds,
+          start_beat + beat_fraction)
+
+      # Compute the time in seconds of this fraction of our beats.
+      subdivision_duration_seconds = 60.0 / subdivision_tempo * subdivision_beat_length
+
+      # Now that we've computed how long this subdivision should play for, add
+      # that to our tally of how long this note has played for.
+      total_note_seconds += subdivision_duration_seconds
+
+    return total_note_seconds
+    
+
   def Generate(self, num_players, steps, tempo_generator, start_time):
     # Grab our player order.
     player_order = self.travel_function(num_players)
