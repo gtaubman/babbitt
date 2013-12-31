@@ -253,7 +253,7 @@ class Gesture:
   # Returns the duration of the specified note in seconds.
   def _ComputeNoteDuration(self, note, start_ts, start_beat, tempo_fn):
     # Into how many pieces we'd like to subdivide the note.
-    subdivide = 10000
+    subdivide = 100 * note.GetBeats()
 
     # This is how many beats we need to compute.
     beats = note.GetBeats()
