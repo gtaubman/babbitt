@@ -356,7 +356,7 @@ class Gesture:
 EDGE = 50
 
 colors = []
-for i in xrange(30):
+for i in xrange(100):
   colors.append((random.randrange(255), random.randrange(255),
       random.randrange(255)))
 
