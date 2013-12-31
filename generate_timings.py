@@ -39,6 +39,23 @@ def ODD_PLAYERS(num_players):
 def BOUNCE(num_players):
   return IN_ORDER(num_players) + REVERSE_ORDER(num_players)[1:-1]
 
+# EXPLODE first has player 1 play, then players 1 and 2, then 1 2 and 3, etc.
+def EXPLODE(num_players):
+  big = []
+  for i in xrange(num_players):
+    small = []
+    for j in xrange(i + 1):
+      small.append(j)
+    big.append(small)
+  return big
+
+# REVERSE_EXPLODE starts by having all players play at the same time, followed
+# by all but the last player, followed by all but the last two, etc.
+def REVERSE_EXPLODE(num_players):
+  x = EXPLODE(num_players)
+  x.reverse()
+  return x
+
 # Returns the duration of a list of events.
 def Duration(events):
   if len(events) == 0:
@@ -47,6 +64,9 @@ def Duration(events):
     return events[0].stop - events[0].start
 
   return events[-1].stop - events[0].start
+
+def Beats(notes):
+  return sum([n.GetBeats() for n in notes])
 
 # NOTE FUNCTIONS:
 #
@@ -156,14 +176,14 @@ class Whole(Note):
 
 # FIXED_TEMPO always returns the same BPM regardless of timestamp.
 def FIXED_TEMPO(bpm):
-  def ReturnTempo(global_start_time):
+  def ReturnTempo(ts, beats):
     return bpm
   return ReturnTempo
 
 # TEMPO_RAMP ramps the tempo linearly from from_bpm to to_bpm over the course of
 # duration seconds.
-def TEMPO_RAMP(from_bpm, to_bpm, duration):
-  def ReturnTempo(timestamp):
+def TEMPO_RAMP_SECONDS(from_bpm, to_bpm, duration):
+  def ReturnTempo(timestamp, beats):
     if timestamp < 0:
       return from_bpm
     if timestamp > duration:
@@ -173,12 +193,23 @@ def TEMPO_RAMP(from_bpm, to_bpm, duration):
     return from_bpm * (1.0 - frac) + to_bpm * frac
   return ReturnTempo
 
+def TEMPO_RAMP_BEATS(from_bpm, to_bpm, duration):
+  def ReturnTempo(timestamp, beats):
+    if beats < 0:
+      return from_bpm
+    if beats > duration:
+      return to_bpm
+
+    frac = beats / float(duration)
+    return from_bpm * (1.0 - frac) + to_bpm * frac
+  return ReturnTempo
+
 # SINE_TEMPO creates a tempo which alternates between low and high BPM in a
 # sinusoidal manner.
 def SINE_TEMPO(low, high):
   assert low < high
 
-  def ReturnTempo(timestamp):
+  def ReturnTempo(timestamp, beats):
     return low + (high - low) * (1 + math.sin(timestamp)) / 2
   return ReturnTempo
 
@@ -186,12 +217,12 @@ def SINE_TEMPO(low, high):
 # An Event is anything representing a player playing an instrument for a
 # duration.
 class Event:
-  def __init__(self, player_num, instrument, start, stop):
+  def __init__(self, player_num, instrument, start, stop, is_rest):
     self.player_num = player_num
     self.instrument = instrument
     self.start = start
     self.stop = stop
-    self.gesture_end = -1
+    self.is_rest = is_rest
 
   def __str__(self):
     return "%d(%s) %.2f -> %.2f" % (self.player_num, self.instrument,
@@ -253,60 +284,70 @@ class Gesture:
     return total_note_seconds
     
 
-  def Generate(self, num_players, steps, tempo_generator, start_time):
-    # Grab our player order.
+  def _GenerateEventsForPlayer(self, player, notes, start_ts, start_beat, tempo_fn):
+    events = []
+    for note in notes:
+      sys.stdout.write('.')
+      sys.stdout.flush()
+
+      note_duration = self._ComputeNoteDuration(note, start_ts, start_beat, tempo_fn)
+
+      e = Event(player, "", start_ts, start_ts + note_duration, note.IsRest())
+      events.append(e)
+
+      start_ts += note_duration
+      start_beat += note.GetBeats()
+
+    return events
+
+
+  def Generate(self, num_players, steps, tempo_fn, start_ts):
+    events = []
+    start_beat = 0
+
     player_order = self.travel_function(num_players)
 
-    # Prepare our set of events.
-    running_start = 0
-    events = []
-
-    furthest_along_finish = 0
     for step in xrange(steps):
-      # Figure out who the player is for this step.
+      # Get the list of the players for this step.
       players = player_order[step % len(player_order)]
 
+      # If there's only one player, still treat it like a list.
       if type(players) is not list and type(players) is not tuple:
         players = [players]
 
-      longest_simultaneous_player = 0
-      id_of_longest_player = -1
+      # Generate events for all the players playing.
+      events_for_players = []
       for player in players:
-        # Get the notes for this player, and figure out how long they are.
-        notes = self.notes(step, player)
-        player_start = running_start
-        duration_for_player = 0
-        for note in notes:
-          beat_length = note.GetBeats()
-          tempo = 60.0 / tempo_generator(player_start)
-          player_stop = player_start + tempo * beat_length
-          duration_for_player += player_stop - player_start
+        events_for_player = self._GenerateEventsForPlayer(
+          player,
+          self.notes(step, player),
+          start_ts,
+          start_beat,
+          tempo_fn)
 
-          if not note.IsRest():
-            events.append(Event(player,
-              self.instrument,
-              start_time + player_start,
-              start_time + player_stop))
+        # Tack on the instrument.
+        for event in events_for_player:
+          event.instrument = self.instrument
 
-          player_start += duration_for_player
-          furthest_along_finish = max(furthest_along_finish, player_stop)
+        # Remember the events for this player.
+        events_for_players.append(events_for_player)
 
-        if duration_for_player > longest_simultaneous_player:
-          longest_simultaneous_player = duration_for_player
-          id_of_longest_player = player
+      # Figure out which player played for the longest, and advance past the end
+      # of that one.
+      durations = [Duration(x) for x in events_for_players]
+      max_index = durations.index(max(durations))
 
-      running_start += longest_simultaneous_player
+      # Advance our start timestamp and number of beats used.
+      start_ts += durations[max_index]
+      start_beat += Beats(self.notes(step, max_index))
 
-      if step == steps - 1:
-        # If that was our last step, record separately when this gesture ended.
-        # The end of the gesture can be different from the end time of the last
-        # event because we don't store events for rests.  Thus if the list of
-        # notes ends with a rest, the stop time of the final event will be
-        # earlier than when the entire gesture is over.
-        events[-1].gesture_end = start_time + furthest_along_finish
+      # Transfer over the generated events for each player into our list of all
+      # events.
+      for evp in events_for_players:
+        events += evp
 
-      running_start += self.time_between_players(id_of_longest_player,
-          furthest_along_finish)
+      start_ts += self.time_between_players(players[max_index],
+          events_for_players[max_index][-1].stop)
 
     return events
 
@@ -321,6 +362,9 @@ for i in xrange(30):
 
 def Events2HTML(out, instruments, events):
   for event in events:
+    if event.is_rest:
+      continue
+
     div = """
 <div class="span-mark"
      start-ms="%d"
@@ -596,8 +640,8 @@ def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   # Keep track of various bits of information about the gesture.
   gesture_infos[play_id] = { }
   gesture_infos[play_id]["start_time"] = events[0].start
-  gesture_infos[play_id]["end_time"] = events[-1].gesture_end
-  gesture_infos[play_id]["duration"] = events[-1].gesture_end - events[0].start
+  gesture_infos[play_id]["end_time"] = events[0].start + Duration(events)
+  gesture_infos[play_id]["duration"] = Duration(events)
 
   # Write them to the HTML file.
   Events2HTML(visualization_file, all_instruments, events)

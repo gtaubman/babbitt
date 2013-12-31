@@ -5,19 +5,19 @@ class TestTempos(unittest.TestCase):
   def test_fixed(self):
     t = FIXED_TEMPO(100)
 
-    self.assertEquals(t(-100), 100)
-    self.assertEquals(t(100), 100)
-    self.assertEquals(t(1000), 100)
+    self.assertEquals(t(-100, -1), 100)
+    self.assertEquals(t(100, -1), 100)
+    self.assertEquals(t(1000, -1), 100)
 
   def test_ramp(self):
-    r = TEMPO_RAMP(0, 100, 10)
+    r = TEMPO_RAMP_SECONDS(0, 100, 10)
   
-    self.assertEquals(r(-1), 0)
-    self.assertEqual(r(0), 00)
-    self.assertEqual(r(2), 20)
-    self.assertEqual(r(5), 50)
-    self.assertEqual(r(10), 100)
-    self.assertEquals(r(100), 100)
+    self.assertEquals(r(-1, -1), 0)
+    self.assertEqual(r(0, -1), 00)
+    self.assertEqual(r(2, -1), 20)
+    self.assertEqual(r(5, -1), 50)
+    self.assertEqual(r(10, -1), 100)
+    self.assertEquals(r(100, -1), 100)
 
 class TestNoteDuration(unittest.TestCase):
   def test_unchanging_tempo(self):
