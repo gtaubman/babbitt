@@ -380,7 +380,7 @@ def Events2HTML(out, instruments, events):
         event.stop* 1000.0,
         event.player_num,
         instruments.index(event.instrument),
-        event.player_num * (EDGE/2),
+        (2 + event.player_num) * (EDGE/2),
         event.start * EDGE,
         (event.stop - event.start) * EDGE - 1,
         EDGE / 2 - 1,
@@ -392,7 +392,9 @@ def Events2HTML(out, instruments, events):
     out.write(filled_div)
 
 def TimeGrid(out, max_seconds):
-  marker_height = EDGE * 6
+  # The + 2 is to account for the +2 spacing that scoots all the player marks
+  # down.
+  marker_height = (EDGE / 2) * (NUM_PLAYERS + 2)
 
   for player in xrange(1, NUM_PLAYERS + 1):
     div = """
@@ -408,7 +410,7 @@ def TimeGrid(out, max_seconds):
 
     div = """
 <div class="timestamp" style=" top: %d; left: %d;">%s</div>
-""" % (marker_height, i * EDGE, "%d:%02d" % (i/60, i%60))
+""" % (0, i * EDGE, "%d:%02d" % (i/60, i%60))
     out.write(div)
 
 def HTMLHeader(out):
@@ -423,6 +425,7 @@ div.span-mark {
   overflow: hidden;
   font-size: 8pt;
   line-height: 4px;
+  cursor: pointer;
 }
 div.marker {
   position: absolute;
@@ -559,6 +562,12 @@ $("#play").click(function() {
 });
 $("#stop").click(function() {
   $("body").stop();
+});
+$(".span-mark").click(function() {
+  var start_secs = parseInt($(this).attr("start-ms")) / 1000;
+  var stop_secs = parseInt($(this).attr("stop-ms")) / 1000;
+  var player = $(this).attr("player");
+  alert("Start: " + start_secs + ", Stop: " + stop_secs + ", Player: " + player);
 });
 </script>
 
