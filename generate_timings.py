@@ -498,7 +498,8 @@ def WriteControl(out, piece_length):
 <div class="controls">
 <span id="top">&lt;&lt;</span> | <span id="play">Play</span> | <span
 
-id="stop">Stop</span>
+id="stop">Stop</span> | <input name="sound" type="checkbox" id="sound"><label
+for="sound">Sound</label>
 </div>
 
 <script>
@@ -545,6 +546,10 @@ $("#play").click(function() {
             var color = "white";
             if (event.info.action === "on") {
               color = instrumentColors[event.info.instrument]
+              if (sound) { play(event.info.player, event.info.instrument); }
+            } else if (event.info.action === "off") {
+              if (sound) { stop_playing(event.info.player,
+              event.info.instrument); }
             }
 
             var player = $("#player-" + event.info.player);
@@ -562,6 +567,7 @@ $("#play").click(function() {
 });
 $("#stop").click(function() {
   $("body").stop();
+  stop_playing_all();
 });
 $(".span-mark").click(function() {
   var start_secs = parseInt($(this).attr("start-ms")) / 1000;
@@ -569,6 +575,42 @@ $(".span-mark").click(function() {
   var player = $(this).attr("player");
   alert("Start: " + start_secs + ", Stop: " + stop_secs + ", Player: " + player);
 });
+
+var oscs = [];
+var context = new webkitAudioContext();
+var sound = $("#sound").prop("checked");
+$("#sound").click(function() {
+  sound = $(this).prop("checked");
+  if (!sound) {
+    stop_playing_all();
+  }
+})
+
+function setupOscillators() {
+  for (var i = 0; i < 100; i++ ) {
+    var osc = context.createOscillator();
+    osc.type = 0; // Sine.
+    osc.frequency.value = 200 + i * 100;
+    osc.start(0);
+
+    oscs.push(osc); 
+  }
+}
+
+function play(player, instrument) {
+  oscs[player].connect(context.destination);
+}
+function stop_playing(player, instrument) {
+  oscs[player].disconnect(context.destination);
+}
+function stop_playing_all() {
+  for (var i = 0; i < oscs.length; i++) {
+    oscs[i].disconnect(context.destination);
+  }
+}
+
+setupOscillators();
+
 </script>
 
 </body>
