@@ -396,7 +396,7 @@ def TimeGrid(out, max_seconds):
   # down.
   marker_height = (EDGE / 2) * (NUM_PLAYERS + 2)
 
-  for player in xrange(1, NUM_PLAYERS + 1):
+  for player in xrange(1, NUM_PLAYERS + 3):
     div = """
 <div class="cross-marker" style="top: %d; width: %d; height: 1px;"></div>
 """ % (player * (EDGE/2), max_seconds * EDGE)
@@ -621,6 +621,18 @@ def DURATION_OF(play_id):
   global gesture_infos
   return gesture_infos[play_id]["duration"]
 
+def ON_BEAT_OF_GESTURE(beat, play_id):
+  global gesture_infos
+
+  # First grab the tempo for that play id.
+  tempo_fn = gesture_infos[play_id]["tempo"]
+
+  # Now walk through the tempo function to find how many seconds it took to get
+  # to the requested beat.
+  n = ArbitraryNote(beat)
+  g = Gesture()
+  return g._ComputeNoteDuration(n, 0, 0, tempo_fn)
+
 def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   global visualization_file
   global all_instruments
@@ -651,6 +663,7 @@ def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   gesture_infos[play_id]["start_time"] = events[0].start
   gesture_infos[play_id]["end_time"] = events[0].start + Duration(events)
   gesture_infos[play_id]["duration"] = Duration(events)
+  gesture_infos[play_id]["tempo"] = tempo
 
   # Write them to the HTML file.
   Events2HTML(visualization_file, all_instruments, events)
