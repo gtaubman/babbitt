@@ -627,11 +627,12 @@ def ON_BEAT_OF_GESTURE(beat, play_id):
   # First grab the tempo for that play id.
   tempo_fn = gesture_infos[play_id]["tempo"]
 
-  # Now walk through the tempo function to find how many seconds it took to get
-  # to the requested beat.
+  # We create a note that's as long as the number of beats of which we're
+  # interested in finding the offset.  Then we compute the duration of that
+  # note, and offset it by the start of the actual played gesture.
   n = ArbitraryNote(beat)
   g = Gesture()
-  return g._ComputeNoteDuration(n, 0, 0, tempo_fn)
+  return gesture_infos[play_id]["start_time"] + g._ComputeNoteDuration(n, 0, 0, tempo_fn)
 
 def PLAY_GESTURE(gesture, start_time, player_steps, tempo, play_id = ""):
   global visualization_file
